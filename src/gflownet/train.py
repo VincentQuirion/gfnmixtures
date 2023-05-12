@@ -9,6 +9,7 @@ import torch_geometric.data as gd
 from rdkit.Chem.rdchem import Mol as RDMol
 from torch import Tensor
 from torch.utils.data import DataLoader, Dataset
+import wandb
 
 from gflownet.data.sampling_iterator import SamplingIterator
 from gflownet.envs.graph_building_env import GraphActionCategorical, GraphBuildingEnv, GraphBuildingEnvContext
@@ -112,7 +113,7 @@ class GFNTrainer:
         self.num_workers: int = self.hps.get("num_data_loader_workers", 0)
         # The ratio of samples drawn from `self.training_data` during training. The rest is drawn from
         # `self.sampling_model`.
-        self.offline_ratio = self.hps.get("offline_ratio", 0.5)
+        self.offline_ratio = self.hps.get("offline_ratio", 0.)
         # idem, but from `self.test_data` during validation.
         self.valid_offline_ratio = 1
         # If True, print messages during training
@@ -269,20 +270,27 @@ class GFNTrainer:
         self._save_state(self.hps["num_training_steps"])
 
     def _save_state(self, it):
+        file_path = pathlib.Path(self.hps["log_dir"]) / f"step_{it}" / "model_state.pt"
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
         torch.save(
             {
                 "models_state_dict": [self.model.state_dict()],
                 "hps": self.hps,
                 "step": it,
             },
-            open(pathlib.Path(self.hps["log_dir"]) / "model_state.pt", "wb"),
+            open(file_path, "wb"),
         )
 
     def log(self, info, index, key):
-        if not hasattr(self, "_summary_writer"):
-            self._summary_writer = torch.utils.tensorboard.SummaryWriter(self.hps["log_dir"])
-        for k, v in info.items():
-            self._summary_writer.add_scalar(f"{key}_{k}", v, index)
+        if self.hps.get('wandb') is not None:
+            if not hasattr(self, '_wandb_run'):
+                self._wandb_run = wandb.init(project=self.hps['wandb'], dir=self.hps['log_dir'], config={k: v for k, v in self.hps.items() if k != 'wandb'})
+            wandb.log({f'{key}_{k}': v for k, v in info.items()}, step=index) 
+        else:
+            if not hasattr(self, '_summary_writer'):
+                self._summary_writer = torch.utils.tensorboard.SummaryWriter(self.hps['log_dir'])
+            for k, v in info.items():
+                self._summary_writer.add_scalar(f'{key}_{k}', v, index)
 
 
 def cycle(it):

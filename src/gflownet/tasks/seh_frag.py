@@ -1,10 +1,12 @@
 import ast
 import copy
 import os
+import pickle
 import shutil
 import socket
 from typing import Any, Callable, Dict, List, Tuple, Union
 
+import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats as stats
 import torch
@@ -14,11 +16,12 @@ from rdkit import RDLogger
 from rdkit.Chem.rdchem import Mol as RDMol
 from torch import Tensor
 from torch.utils.data import Dataset
+import wandb
 
 from gflownet.algo.trajectory_balance import TrajectoryBalance
 from gflownet.envs.frag_mol_env import FragMolBuildingEnvContext
 from gflownet.envs.graph_building_env import GraphBuildingEnv
-from gflownet.models import bengio2021flow
+from gflownet.models import bengio2021flow, kmeans_classifier
 from gflownet.models.graph_transformer import GraphTransformerGFN
 from gflownet.train import FlatRewards, GFNTask, GFNTrainer, RewardScalar
 from gflownet.utils.transforms import thermometer
@@ -42,7 +45,12 @@ class SEHTask(GFNTask):
         num_thermometer_dim: int,
         rng: np.random.Generator = None,
         wrap_model: Callable[[nn.Module], nn.Module] = None,
+        part: int = None,
+        data_dir: str = None,
     ):
+        self.part = part
+        self.data_dir = data_dir
+
         self._wrap_model = wrap_model
         self.rng = rng
         self.models = self._load_task_models()
@@ -60,7 +68,13 @@ class SEHTask(GFNTask):
     def _load_task_models(self):
         model = bengio2021flow.load_original_model()
         model, self.device = self._wrap_model(model)
-        return {"seh": model}
+        models_dict = {"seh": model}
+
+        if self.part is not None:
+            models_dict.update({"kmeans": 
+                                kmeans_classifier.KMeansClassifier(f"{self.data_dir}/kmeans_model.pkl")})
+
+        return models_dict
 
     def sample_conditional_information(self, n: int) -> Dict[str, Tensor]:
         beta = None
@@ -106,6 +120,31 @@ class SEHTask(GFNTask):
         batch.to(self.device)
         preds = self.models["seh"](batch).reshape((-1,)).data.cpu()
         preds[preds.isnan()] = 0
+        
+        if self.part is not None:
+            parts = self.models['kmeans'](mols)
+
+            if wandb.run is not None:
+                # Count the occurrences of each number
+                counts = np.bincount(parts, minlength=50)
+                good_part_frac = counts[self.part] / sum(counts)
+                to_log = {'Specified part fraction': good_part_frac}
+                if wandb.run.step == 1 or wandb.run.step % 250 == 0:
+                    # Plot the histogram
+                    plt.hist(range(50), bins=50, weights=counts, edgecolor='none')
+                    plt.xlabel('Part')
+                    plt.ylabel('Frequency')
+                    plt.xticks(np.arange(0, 50, 5))
+                    # Set y-axis ticks to integers only
+                    plt.yticks(np.arange(0, max(counts)+1, 5))
+                    # Save the figure and log to wandb
+                    fig = plt.gcf()
+                    to_log.update({'Parts sampled from': wandb.Image(fig)})
+                    plt.close(fig)
+                wandb.log(to_log)
+                
+            preds[parts != self.part] = 0
+        
         preds = self.flat_reward_transform(preds).clip(1e-4, 100).reshape((-1, 1))
         return FlatRewards(preds), is_valid
 
@@ -151,6 +190,8 @@ class SEHFragTrainer(GFNTrainer):
             temperature_parameters=self.hps["temperature_dist_params"],
             num_thermometer_dim=self.hps["num_thermometer_dim"],
             wrap_model=self._wrap_model_mp,
+            part=self.hps.get("part"),
+            data_dir=self.hps.get("data_dir"),
         )
 
     def setup_model(self):
@@ -168,8 +209,20 @@ class SEHFragTrainer(GFNTrainer):
         self.env = GraphBuildingEnv()
         self.training_data = []
         self.test_data = []
-        self.offline_ratio = 0
+        self.offline_ratio = self.hps.get("offline_ratio", 0)
         self.valid_offline_ratio = 0
+
+        # Add training data if sampling from specified part
+        if self.hps.get('part') is not None and self.offline_ratio is not None:
+            data_dir = hps['data_dir']
+            with open(f'{data_dir}/training_set_graphs.pkl', 'rb') as file:
+                graphs = pickle.load(file)
+            with open(f'{data_dir}/training_set_rewards.pkl', 'rb') as file:
+                rewards = pickle.load(file)
+            with open(f'{data_dir}/part_idxs.pkl', 'rb') as file:
+                valid_idxs = pickle.load(file)
+            self.training_data = TrainingDataset(valid_idxs[self.hps['part']], graphs, rewards)
+
         self.setup_env_context()
         self.setup_algo()
         self.setup_task()
@@ -218,6 +271,18 @@ class SEHFragTrainer(GFNTrainer):
         if self.sampling_tau > 0:
             for a, b in zip(self.model.parameters(), self.sampling_model.parameters()):
                 b.data.mul_(self.sampling_tau).add_(a.data * (1 - self.sampling_tau))
+
+
+class TrainingDataset(Dataset):
+    def __init__(self, in_part_idxs, graphs, rewards):
+        self.in_part_idxs = in_part_idxs
+        self.graphs = graphs
+        self.rewards = rewards
+    def __len__(self):
+        return len(self.in_part_idxs)
+    def __getitem__(self, idx):
+        valid_idx = self.in_part_idxs[idx]
+        return self.graphs[valid_idx], self.rewards[valid_idx]
 
 
 def main():

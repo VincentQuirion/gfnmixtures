@@ -146,10 +146,12 @@ class SamplingIterator(IterableDataset):
                 cond_info = self.task.sample_conditional_information(num_offline + self.online_batch_size)
                 # Sample some dataset data
                 mols, flat_rewards = map(list, zip(*[self.data[i] for i in idcs])) if len(idcs) else ([], [])
-                flat_rewards = (
-                    list(self.task.flat_reward_transform(torch.stack(flat_rewards))) if len(flat_rewards) else []
-                )
-                graphs = [self.ctx.mol_to_graph(m) for m in mols]
+                # flat_rewards = (
+                #     list(self.task.flat_reward_transform(torch.stack(flat_rewards))) if len(flat_rewards) else []
+                # )
+                # graphs = [self.ctx.mol_to_graph(m) for m in mols]
+                graphs = mols
+                # graphs = [self.ctx.mol_to_graph(m) for m in mols] if (len(mols) == 0 or type(mols[0]) is not nx.classes.graph.Graph) else mols
                 trajs = self.algo.create_training_data_from_graphs(graphs)
                 num_online = self.online_batch_size
             else:  # If we're not sampling the conditionals, then the idcs refer to listed preferences
