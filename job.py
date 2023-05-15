@@ -12,6 +12,7 @@ parser.add_argument('--log_dir', type=str)
 parser.add_argument('--data_dir', type=str)
 parser.add_argument('--wandb', type=str)
 parser.add_argument('--part', type=int, default=None)
+parser.add_argument('--total_parts', type=int, default=None)
 
 args = parser.parse_args()
 
@@ -38,6 +39,7 @@ hps = {
 
 if args.part is not None:
     hps.update({'part': args.part})
+    hps.update({'total_parts': args.total_parts})
 
 if os.path.exists(hps['log_dir']):
     if hps['overwrite_existing_exp'] and hps['log_dir'] != hps.get('data_dir', 1234):

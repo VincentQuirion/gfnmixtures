@@ -15,4 +15,4 @@ module load cuda/11.3
 
 # 3. Launch your job, tell it to save the model in $SLURM_TMPDIR
 #    and look for the dataset into $SLURM_TMPDIR
-python job.py --wandb=<wandb project name> --log_dir=<log dir>/$SLURM_ARRAY_TASK_ID --data_dir=<data_dir> --part=$SLURM_ARRAY_TASK_ID
+python job.py --wandb=<wandb project name> --log_dir=<log dir>/$SLURM_ARRAY_TASK_ID --data_dir=<data_dir> --part=$SLURM_ARRAY_TASK_ID --total_parts=$SLURM_ARRAY_TASK_COUNT

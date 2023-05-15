@@ -46,9 +46,11 @@ class SEHTask(GFNTask):
         rng: np.random.Generator = None,
         wrap_model: Callable[[nn.Module], nn.Module] = None,
         part: int = None,
+        total_parts: int = None,
         data_dir: str = None,
     ):
         self.part = part
+        self.total_parts = total_parts
         self.data_dir = data_dir
 
         self._wrap_model = wrap_model
@@ -72,7 +74,7 @@ class SEHTask(GFNTask):
 
         if self.part is not None:
             models_dict.update({"kmeans": 
-                                kmeans_classifier.KMeansClassifier(f"{self.data_dir}/kmeans_model.pkl")})
+                                kmeans_classifier.KMeansClassifier(f"{self.data_dir}/{self.total_parts}_kmeans_model.pkl")})
 
         return models_dict
 
@@ -126,15 +128,15 @@ class SEHTask(GFNTask):
 
             if wandb.run is not None:
                 # Count the occurrences of each number
-                counts = np.bincount(parts, minlength=50)
+                counts = np.bincount(parts, minlength=self.total_parts)
                 good_part_frac = counts[self.part] / sum(counts)
                 to_log = {'Specified part fraction': good_part_frac}
                 if wandb.run.step == 1 or wandb.run.step % 250 == 0:
                     # Plot the histogram
-                    plt.hist(range(50), bins=50, weights=counts, edgecolor='none')
+                    plt.hist(range(self.total_parts), bins=self.total_parts, weights=counts, edgecolor='none')
                     plt.xlabel('Part')
                     plt.ylabel('Frequency')
-                    plt.xticks(np.arange(0, 50, 5))
+                    plt.xticks(np.arange(0, self.total_parts, max(self.total_parts // 10, 1)))
                     # Set y-axis ticks to integers only
                     plt.yticks(np.arange(0, max(counts)+1, 5))
                     # Save the figure and log to wandb
@@ -191,6 +193,7 @@ class SEHFragTrainer(GFNTrainer):
             num_thermometer_dim=self.hps["num_thermometer_dim"],
             wrap_model=self._wrap_model_mp,
             part=self.hps.get("part"),
+            total_parts=self.hps.get("total_parts"),
             data_dir=self.hps.get("data_dir"),
         )
 
