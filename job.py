@@ -30,16 +30,18 @@ hps = {
     'temperature_sample_dist': 'constant',
     'sampling_tau': 0.99,
     'mp_pickle_messages': True,
-    'offline_ratio': 0.25,
+    'offline_ratio': 0.0,
 
     'data_dir': args.data_dir,
 
     'wandb': args.wandb,
 }
 
-if args.part is not None:
-    hps.update({'part': args.part})
-    hps.update({'total_parts': args.total_parts})
+if args.part is not None and args.total_parts is not None:
+    if args.total_parts > 1:
+        hps.update({'part': args.part})
+        hps.update({'total_parts': args.total_parts})
+        hps.upate({'offline_ratio' : 0.25})
 
 if os.path.exists(hps['log_dir']):
     if hps['overwrite_existing_exp'] and hps['log_dir'] != hps.get('data_dir', 1234):

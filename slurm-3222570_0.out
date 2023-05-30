@@ -1,0 +1,63 @@
+[=== Module cudatoolkit/11.3 loaded ===]
+17/05/2023 21:39:09 - INFO - logger - Starting training
+Traceback (most recent call last):
+  File "/home/mila/v/vincent.quirion/CURRENT_molecules/job.py", line 54, in <module>
+    trial.run()
+  File "/home/mila/v/vincent.quirion/.conda/envs/env/lib/python3.9/site-packages/gflownet/train.py", line 250, in run
+    for it, batch in zip(range(start, 1 + self.hps["num_training_steps"]), cycle(train_dl)):
+  File "/home/mila/v/vincent.quirion/.conda/envs/env/lib/python3.9/site-packages/gflownet/train.py", line 298, in cycle
+    for i in it:
+  File "/home/mila/v/vincent.quirion/.conda/envs/env/lib/python3.9/site-packages/torch/utils/data/dataloader.py", line 521, in __next__
+    data = self._next_data()
+  File "/home/mila/v/vincent.quirion/.conda/envs/env/lib/python3.9/site-packages/torch/utils/data/dataloader.py", line 561, in _next_data
+    data = self._dataset_fetcher.fetch(index)  # may raise StopIteration
+  File "/home/mila/v/vincent.quirion/.conda/envs/env/lib/python3.9/site-packages/torch/utils/data/_utils/fetch.py", line 39, in fetch
+    data = next(self.dataset_iter)
+  File "/home/mila/v/vincent.quirion/.conda/envs/env/lib/python3.9/site-packages/gflownet/data/sampling_iterator.py", line 141, in __iter__
+    for idcs in self._idx_iterator():
+  File "/home/mila/v/vincent.quirion/.conda/envs/env/lib/python3.9/site-packages/gflownet/data/sampling_iterator.py", line 100, in _idx_iterator
+    yield self.rng.integers(0, len(self.data), self.offline_batch_size)
+  File "_generator.pyx", line 550, in numpy.random._generator.Generator.integers
+  File "_bounded_integers.pyx", line 1247, in numpy.random._bounded_integers._rand_int64
+ValueError: high <= 0
+
+======== GPU REPORT ========
+
+==============NVSMI LOG==============
+
+Timestamp                                 : Wed May 17 21:39:10 2023
+Driver Version                            : 515.65.01
+CUDA Version                              : 11.7
+
+Attached GPUs                             : 1
+GPU 00000000:A3:00.0
+    Accounting Mode                       : Enabled
+    Accounting Mode Buffer Size           : 4000
+    Accounted Processes
+        Process ID                        : 55869
+            GPU Utilization               : 1 %
+            Memory Utilization            : 0 %
+            Max memory usage              : 2323 MiB
+            Time                          : 24725 ms
+            Is Running                    : 0
+
+Wed May 17 21:39:10 2023       
++-----------------------------------------------------------------------------+
+| NVIDIA-SMI 515.65.01    Driver Version: 515.65.01    CUDA Version: 11.7     |
+|-------------------------------+----------------------+----------------------+
+| GPU  Name        Persistence-M| Bus-Id        Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp  Perf  Pwr:Usage/Cap|         Memory-Usage | GPU-Util  Compute M. |
+|                               |                      |               MIG M. |
+|===============================+======================+======================|
+|   0  NVIDIA A100 80G...  On   | 00000000:A3:00.0 Off |                    0 |
+| N/A   39C    P0    72W / 300W |      0MiB / 81920MiB |      0%      Default |
+|                               |                      |             Disabled |
++-------------------------------+----------------------+----------------------+
+                                                                               
++-----------------------------------------------------------------------------+
+| Processes:                                                                  |
+|  GPU   GI   CI        PID   Type   Process name                  GPU Memory |
+|        ID   ID                                                   Usage      |
+|=============================================================================|
+|  No running processes found                                                 |
++-----------------------------------------------------------------------------+
